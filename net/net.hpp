@@ -14,6 +14,8 @@
 
 namespace nodecxx {
 
+createEvent(connection);
+
 namespace core {
 extern boost::asio::io_service service;
 }
@@ -121,7 +123,13 @@ class Server {
 public:
     template<class Callback>
     Server(Callback&& callback) : callback(std::forward<Callback>(callback)) {}
+    Server() {}
     void listen(const std::string& port, const std::string& host);
+    template<class Callback>
+    void on(connection_t, Callback&& callback)
+    {
+        this->callback = callback;
+    }
 private:
     void do_accept(typename Protocol::acceptor& acceptor);
 };
