@@ -1,6 +1,5 @@
 #include <core.hpp>
 #include "http.hpp"
-#include "http_parser.h"
 
 using namespace boost::asio;
 
