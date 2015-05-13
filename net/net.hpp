@@ -11,27 +11,19 @@
 #include <boost/asio.hpp>
 
 #include "events.hpp"
+#include <events.hpp>
+#include <core.hpp>
 
 namespace nodecxx {
 
-createEvent(connection);
-
-namespace core {
-extern boost::asio::io_service service;
-}
 
 template<class Protocol>
-class Socket {
+class Socket : public EmittingEvents<close_t, data_t, error_t, drain_t> {
     boost::asio::basic_stream_socket<Protocol> socket;
     std::vector<char> buffer;
     std::queue<std::pair<std::vector<char>, bool>> sendBuffer;
-private: // event listeners
-    std::vector<std::function<void(const boost::system::error_code&)>> errorListeners;
-    std::vector<std::function<void()>> drainListeners;
-    std::vector<std::function<void(const std::vector<char>&)>> readListeners;
-    std::vector<std::function<void(bool)>> closeListeners;
 public:
-    Socket() : socket(core::service) {}
+    Socket() : socket(core::service()) {}
 public: // functionality
     boost::asio::basic_stream_socket<Protocol>& native() { return socket; }
     void close();
@@ -51,26 +43,6 @@ public: // functionality
         sendBuffer.emplace(std::forward<B>(data), true);
         if (sendBuffer.size() == 1) do_send();
     }
-public: // events
-    template<class C>
-    void on(error_t, C&& callback) {
-        errorListeners.emplace_back(std::forward<C>(callback));
-    }
-    template<class C>
-    void on(drain_t, C&& callback)
-    {
-        drainListeners.emplace_back(std::forward<C>(callback));
-    }
-    template<class C>
-    void on(data_t, C&& callback)
-    {
-        readListeners.emplace_back(std::forward<C>(callback));
-    }
-    template<class C>
-    void on(close_t, C&& callback)
-    {
-        closeListeners.emplace_back(std::forward<C>(callback));
-    }
 public:
     void do_read()
     {
@@ -80,18 +52,14 @@ public:
                 [this](const boost::system::error_code& ec, size_t bt) {
             if (check_error(ec)) return;
             buffer.resize(bt);
-            for (auto& f : readListeners) {
-                f(buffer);
-            }
+            fireEvent(data, buffer);
             do_read();
         });
     }
 private:
     bool check_error(const boost::system::error_code& ec) {
         if (!ec) return false;
-        for (auto& f : errorListeners) {
-            f(ec);
-        }
+        fireEvent(error, ec);
         if (!socket.is_open()) close();
         return true;
     }
@@ -107,14 +75,18 @@ private:
                 sendBuffer.pop();
                 if (sendBuffer.size()) do_send();
                 else {
-                    for (auto& f : drainListeners) {
-                        f();
-                    }
+                    fireEvent(drain);
                 }
             }
         });
     }
 };
+
+struct connection_t {
+    constexpr connection_t() {}
+};
+
+constexpr connection_t connection;
 
 template<class Protocol>
 class Server {
@@ -149,13 +121,13 @@ TcpServer createServer(Callback&& callback) {
 template<class Protocol>
 void Server<Protocol>::listen(const std::string& port, const std::string& host)
 {
-    auto resolver = std::make_shared<typename Protocol::resolver>(core::service);
-    auto strand = std::make_shared<boost::asio::io_service::strand>(core::service);
+    auto resolver = std::make_shared<typename Protocol::resolver>(core::service());
+    auto strand = std::make_shared<boost::asio::io_service::strand>(core::service());
     resolver->async_resolve(typename Protocol::resolver::query(host, port),
         strand->wrap([this, resolver](const boost::system::error_code& ec, typename Protocol::resolver::iterator iterator) {
             typename Protocol::resolver::iterator end;
             for (; iterator != end; ++iterator) {
-                acceptors.emplace_back(core::service, *iterator);
+                acceptors.emplace_back(core::service(), *iterator);
                 auto& myAcceptor = acceptors.back();
                 do_accept(myAcceptor);
             }
@@ -179,9 +151,7 @@ void Socket<Protocol>::close()
     bool hadError = socket.is_open();
     if (!hadError)
         socket.close();
-    for (auto& f : closeListeners) {
-        f(hadError);
-    }
+    this->fireEvent(::nodecxx::close, hadError);
     delete this;
 }
 

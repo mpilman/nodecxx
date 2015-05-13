@@ -1,13 +1,37 @@
 #pragma once
-
-#define createEvent(name) struct name##_t { constexpr name##_t() {} }; constexpr name##_t name;
+#include <functional>
+#include <vector>
+#include <boost/system/error_code.hpp>
 
 namespace nodecxx {
 
-createEvent(close);
-createEvent(data);
-createEvent(error);
-createEvent(drain);
+struct close_t {
+    using function_type = std::function<void(bool)>;
+    constexpr close_t() {}
+};
+
+constexpr close_t close;
+
+struct data_t {
+    using function_type = std::function<void(const std::vector<char>&)>;
+    constexpr data_t() {}
+};
+
+constexpr data_t data;
+
+struct error_t {
+    using function_type = std::function<void(const boost::system::error_code&)>;
+    constexpr error_t() {}
+};
+
+constexpr error_t error; 
+
+struct drain_t {
+    using function_type = std::function<void()>;
+    constexpr drain_t() {}
+};
+
+constexpr drain_t drain;
 
 } // namespace nodecxx
 

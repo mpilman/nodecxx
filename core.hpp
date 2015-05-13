@@ -3,7 +3,7 @@
 
 namespace nodecxx {
 namespace core {
-extern boost::asio::io_service service;
+boost::asio::io_service& service();
 } // namespace core
 
 void run(unsigned numThreads = 1);
