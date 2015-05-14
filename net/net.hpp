@@ -22,6 +22,7 @@ class Socket : public EmittingEvents<close_t, data_t, error_t, drain_t> {
     boost::asio::basic_stream_socket<Protocol> socket;
     std::vector<char> buffer;
     std::queue<std::pair<std::vector<char>, bool>> sendBuffer;
+    bool insideSend = false;
 public:
     Socket() : socket(core::service()) {}
 public: // functionality
@@ -36,7 +37,7 @@ public: // functionality
     template<class B>
     void write(B&& data) {
         sendBuffer.emplace(std::forward<B>(data), false);
-        if (sendBuffer.size() == 1) do_send();
+        do_send();
     }
     template<class B>
     void end(B&& data) {
@@ -69,14 +70,15 @@ private:
     }
     void do_send()
     {
-        assert(sendBuffer.size());
+        if (insideSend) return;
+        insideSend = true;
         boost::asio::async_write(socket, boost::asio::buffer(sendBuffer.front().first), [this](const boost::system::error_code& ec, size_t) {
             if (check_error(ec)) return;
             if (sendBuffer.front().second) {
                 close();
             } else {
-                // TODO: This code needs some synchronization!
                 sendBuffer.pop();
+                insideSend = false;
                 if (sendBuffer.size()) do_send();
                 else {
                     fireEvent(drain);
