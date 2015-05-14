@@ -21,6 +21,8 @@ set(SRCS
     http/http_parser.h
     http/http_parser.c
     http/http.hpp
-    http/http.cpp)
+    http/http.cpp
+    fs/fs.hpp
+    fs/fs.cpp)
 add_executable(node ${SRCS})
 target_link_libraries(node ${Boost_LIBRARIES})
