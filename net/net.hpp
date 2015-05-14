@@ -60,7 +60,11 @@ private:
     bool check_error(const boost::system::error_code& ec) {
         if (!ec) return false;
         fireEvent(error, ec);
-        if (!socket.is_open()) close();
+        fireEvent(::nodecxx::close, true);
+        if (socket.is_open())
+            socket.close();
+        else
+            delete this;
         return true;
     }
     void do_send()
@@ -89,7 +93,7 @@ struct connection_t {
 constexpr connection_t connection;
 
 template<class Protocol>
-class Server {
+class Server : public EmittingEvents<error_t> {
     std::function<void(Socket<Protocol>&)> callback;
     std::vector<typename Protocol::acceptor> acceptors;
 public:
@@ -103,7 +107,7 @@ public:
         this->callback = callback;
     }
 private:
-    void do_accept(typename Protocol::acceptor& acceptor);
+    void do_accept(size_t acceptorPos);
 };
 
 using TcpServer = Server<boost::asio::ip::tcp>;
@@ -128,20 +132,29 @@ void Server<Protocol>::listen(const std::string& port, const std::string& host)
             typename Protocol::resolver::iterator end;
             for (; iterator != end; ++iterator) {
                 acceptors.emplace_back(core::service(), *iterator);
-                auto& myAcceptor = acceptors.back();
-                do_accept(myAcceptor);
+            }
+            for (size_t i = 0; i < acceptors.size(); ++i) {
+                do_accept(i);
             }
         }));
 }
 
 template<class Protocol>
-void Server<Protocol>::do_accept(typename Protocol::acceptor& acceptor)
+void Server<Protocol>::do_accept(size_t acceptorPos)
 {
     auto sock = new Socket<Protocol>();
-    acceptor.async_accept(sock->native(), [this, sock, &acceptor](const boost::system::error_code& ec) {
-        do_accept(acceptor);
-        sock->do_read();
-        callback(*sock);
+    acceptors[acceptorPos].async_accept(sock->native(), [this, sock, acceptorPos](const boost::system::error_code& ec) {
+        if (ec) {
+            fireEvent(error, ec);
+            if (sock->native().is_open())
+                sock->close();
+            else
+                delete sock;
+        } else {
+            callback(*sock);
+            sock->do_read();
+            do_accept(acceptorPos);
+        }
     });
 }
 

@@ -48,7 +48,7 @@ protected:
 }; 
 
 template<>
-struct EmittingEvents<> {
+class EmittingEvents<> {
 };
 
 }

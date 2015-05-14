@@ -152,11 +152,11 @@ public:
         mHttpMajor = parser.http_major;
         mHttpMinor = parser.http_minor;
         mMethod = ::http_method_str(static_cast<::http_method>(parser.method));
+        IncomingMessage::onMessageBegin();
     }
 
     void onMessageBegin()
     {
-        IncomingMessage::onMessageBegin();
     }
 
     void onMessageComplete()

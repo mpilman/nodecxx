@@ -25,11 +25,11 @@ using namespace nodecxx;
 //    server.listen("8713", "localhost");
 //    run();
 //}
-//
+
 
 int main()
 {
-    auto html = std::string("<html><head><title>Hello</title></head><body><h1></h1></body></html>");
+    auto html = std::string("<html><head><title>Hello</title></head><body><h1>Hello World</h1></body></html>");
     std::vector<char> htmlReq(html.begin(), html.end());
     HttpServer server;
     server.on(request, [&htmlReq](auto& req, auto& resp) {
