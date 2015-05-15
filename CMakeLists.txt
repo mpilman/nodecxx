@@ -23,6 +23,8 @@ set(SRCS
     http/http.hpp
     http/http.cpp
     fs/fs.hpp
-    fs/fs.cpp)
+    fs/fs.cpp
+    externals/json11/json11.cpp
+    )
 add_executable(node ${SRCS})
 target_link_libraries(node ${Boost_LIBRARIES})

@@ -1,4 +1,5 @@
 #pragma once
+#include <json>
 #include <events.hpp>
 #include <net/net.hpp>
 #include <net/events.hpp>
@@ -19,6 +20,7 @@ class HttpServerResponse : public EmittingEvents<close_t> {
     bool mHeadersSent = false;
     std::unordered_map<std::string, std::string> mHeaders;
     unsigned mContentLength = 0;
+    std::string buffer;
 private:
     void reset();
     void prepareSend();
@@ -55,7 +57,7 @@ public:
 };
 
 struct upgrade_t {
-    using function_type = std::function<void(IncomingMessage&, HttpServerResponse&, const std::vector<char>&)>;
+    using function_type = std::function<void(IncomingMessage&, HttpServerResponse&, const std::string&)>;
     constexpr upgrade_t() {}
 };
 
@@ -76,7 +78,7 @@ protected:
     HttpServerResponse* recycledResponse = nullptr;
 protected: // internal callbacks
     void onMessageBegin();
-    void handleUpgrade(const ::http_parser& parser, const std::vector<char>& buffer);
+    void handleUpgrade(const ::http_parser& parser, const std::string& buffer);
 protected: // construction
     IncomingMessage(Socket<boost::asio::ip::tcp>& socket, HttpServer& server)
         : socket(socket)
@@ -114,25 +116,27 @@ private:
     void messageBegin(IncomingMessage* req, HttpServerResponse* resp);
 };
 
-
 template<class B>
 void HttpServerResponse::write(B&& b)
 {
+    serializer<B> ser;
     if (!mHeadersSent)
-        prepareSend();
+        buffer += ser(std::forward<B>(b));
     incomingMessage.socket.write(b);
 }
 
 template<class B>
 void HttpServerResponse::end(B&& b)
 {
+    serializer<B> ser;
+    buffer += ser(std::forward<B>(b));
     if (!mHeadersSent) {
         if (mContentLength == 0) {
-            mContentLength = b.size();
+            mContentLength = buffer.size();
         }
         prepareSend();
     }
-    incomingMessage.socket.write(b);
+    incomingMessage.socket.write(buffer);
 }
 
 } // namespace nodecxx

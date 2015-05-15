@@ -1,6 +1,5 @@
 #pragma once
 #include <functional>
-#include <vector>
 #include <boost/system/error_code.hpp>
 
 namespace nodecxx {
@@ -13,7 +12,7 @@ struct close_t {
 constexpr close_t close;
 
 struct data_t {
-    using function_type = std::function<void(const std::vector<char>&)>;
+    using function_type = std::function<void(const char*, size_t)>;
     constexpr data_t() {}
 };
 

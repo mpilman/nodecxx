@@ -2,7 +2,6 @@
 #include <string>
 #include <memory>
 #include <functional>
-#include <vector>
 #include <queue>
 #include <cassert>
 #include <atomic>
@@ -13,15 +12,37 @@
 #include "events.hpp"
 #include <events.hpp>
 #include <core.hpp>
+#include <json>
 
 namespace nodecxx {
 
+template<class T>
+struct serializer {
+    std::string operator() (const T& obj) const {
+        return std::string(obj.begin(), obj.end());
+    }
+};
+
+template<>
+struct serializer<std::string> {
+    template<class O>
+    std::string operator() (O&& obj) const {
+        return std::string(std::forward<O>(obj));
+    }
+};
+
+template<>
+struct serializer<Json> {
+    std::string operator() (const Json& json) const {
+        return json.dump();
+    }
+};
 
 template<class Protocol>
 class Socket : public EmittingEvents<close_t, data_t, error_t, drain_t> {
     boost::asio::basic_stream_socket<Protocol> socket;
     std::vector<char> buffer;
-    std::queue<std::pair<std::vector<char>, bool>> sendBuffer;
+    std::queue<std::pair<std::string, bool>> sendBuffer;
     bool insideSend = false;
 public:
     Socket() : socket(core::service()) {}
@@ -36,12 +57,14 @@ public: // functionality
     }
     template<class B>
     void write(B&& data) {
-        sendBuffer.emplace(std::forward<B>(data), false);
+        serializer<typename std::remove_const<typename std::remove_reference<B>::type>::type> ser;
+        sendBuffer.emplace(ser(std::forward<B>(data)), false);
         do_send();
     }
     template<class B>
     void end(B&& data) {
-        sendBuffer.emplace(std::forward<B>(data), true);
+        serializer<typename std::remove_const<typename std::remove_reference<B>::type>::type> ser;
+        sendBuffer.emplace(ser(std::forward<B>(data)), true);
         if (sendBuffer.size() == 1) do_send();
     }
 public:
@@ -49,11 +72,12 @@ public:
     {
         if (!socket.is_open()) return;
         buffer.resize(1024);
+        // TODO: this might not be safe
         socket.async_read_some(boost::asio::buffer(buffer),
                 [this](const boost::system::error_code& ec, size_t bt) {
             if (check_error(ec)) return;
             buffer.resize(bt);
-            fireEvent(data, buffer);
+            fireEvent(data, buffer.data(), buffer.size());
             do_read();
         });
     }

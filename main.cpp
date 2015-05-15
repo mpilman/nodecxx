@@ -29,12 +29,14 @@ using namespace nodecxx;
 
 int main()
 {
-    auto html = std::string("<html><head><title>Hello</title></head><body><h1>Hello World</h1></body></html>");
-    std::vector<char> htmlReq(html.begin(), html.end());
     HttpServer server;
-    server.on(request, [&htmlReq](auto& req, auto& resp) {
-        resp.setHeader("Content-Type", "text/html");
-        resp.end(htmlReq);
+    server.on(request, [](auto& req, auto& resp) {
+        resp.setHeader("Content-Type", "application/json");
+        resp.end(Json(Json::object {
+            { "key1", "value1" },
+            { "key2", "value2" },
+            { "arr", Json::array {12.5, 2.0} }
+        }));
     });
     server.listen("8713", "localhost");
     run();

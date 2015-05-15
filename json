@@ -1,0 +1,9 @@
+#include "externals/json11/json11.hpp"
+
+namespace nodecxx {
+
+using JsonValue = json11::JsonValue;
+using Json = json11::Json;
+
+}
+

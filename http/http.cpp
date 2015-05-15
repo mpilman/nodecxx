@@ -116,8 +116,8 @@ public:
 private:
 public:
     void parseRequest() {
-        socket.on(data, [this](const std::vector<char>& d) {
-            ::http_parser_execute(&parser, &parserSettings, d.data(), d.size());
+        socket.on(data, [this](const char* d, size_t s) {
+            ::http_parser_execute(&parser, &parserSettings, d, s);
             if (onMessageCompleteCalled && parser.upgrade == 1) {
                 handleUpgrade(parser, d);
             }
@@ -167,10 +167,7 @@ public:
 
     void onBody(const char* str, size_t len)
     {
-        // TODO: This copy should be avoided - we probably need something
-        // like boost::asio::buffer for this callback instead of a vector
-        std::vector<char> d(str, str + len);
-        fireEvent(data, d);
+        fireEvent(data, str, len);
     }
 };
 
@@ -251,8 +248,8 @@ void IncomingMessage::onMessageBegin()
     server.messageBegin(this, recycledResponse);
 }
 
-void IncomingMessage::handleUpgrade(const ::http_parser& parser, const std::vector<char>& buffer) {
-    std::vector<char> initialData(buffer.begin() + parser.nread, buffer.end());
+void IncomingMessage::handleUpgrade(const ::http_parser& parser, const std::string& buffer) {
+    std::string initialData(buffer.begin() + parser.nread, buffer.end());
     clearListeners(data);
     if (recycledResponse == nullptr) {
         recycledResponse = new HttpServerResponse(*this);
@@ -334,8 +331,7 @@ void HttpServerResponse::prepareSend()
     }
     ss << "\r\n";
     const auto& s = ss.str();
-    std::vector<char> headers(s.begin(), s.end());
-    incomingMessage.socket.write(std::move(headers));
+    incomingMessage.socket.write(s);
 }
 
 
