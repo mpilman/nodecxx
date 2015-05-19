@@ -1,3 +1,6 @@
 [submodule "externals/json11"]
 	path = externals/json11
 	url = git@github.com:dropbox/json11.git
+[submodule "externals/uriparser"]
+	path = externals/uriparser
+	url = git://git.code.sf.net/p/uriparser/git
